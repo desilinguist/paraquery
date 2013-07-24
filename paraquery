@@ -1,0 +1,4 @@
+#!/bin/bash
+
+ROOTDIR="`cd "$( dirname "$0" )" && pwd `"
+/usr/bin/env python $ROOTDIR/queryshell.py "$@"
