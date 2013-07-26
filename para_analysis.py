@@ -2,11 +2,13 @@
 # Author: Lili Kotlerman, lili.dav@gmail.com, June 2012
 
 import sys
-import scipy.stats as stats
 import math
-import para_wn as wn
+import operator
 import random
+
 import nltk
+import para_wn as wn
+import scipy.stats as stats
 
 #can rename, but must sort in this order
 parts = ['top', 'middle', 'bottom']
@@ -18,19 +20,28 @@ pivots = 'pivots'
 distances = 'WN distances'
 per_source = 'per source side'
 
+
 # TODO: hacky, may be replace with Decimal?
 def feq(a, b):
     #Check whether 2 floats are equal
     return abs(a - b) < 0.00000001
 
+
 def get_prob(rule):
     return math.exp(-float(rule[2]))
 
-def rule_for_print(rule):
-    w1 = rule[0]
-    w2 = rule[1]
-    prob = get_prob(rule)
-    return w1 + ' => ' + w2 + '  [' + str(prob) + ']'
+
+def rules_to_strings(rules):
+    srclens = map(len, map(operator.itemgetter(0), rules))
+    trglens = map(len, map(operator.itemgetter(1), rules))
+    maxsrclen, maxtrglen = max(srclens), max(trglens)
+    for rule in rules:
+        src = rule[0]
+        trg = rule[1]
+        pe2e1 = get_prob(rule)
+        pe2e1str = '{:>6.4}'.format(pe2e1) if pe2e1 < 0.0001 else '{:0<6.4f}'.format(pe2e1)
+        yield '{} => {} [{}]'.format(src.rjust(maxsrclen), trg.ljust(maxtrglen), pe2e1str)
+
 
 def get_score_distribution(rule_list):
     score_distribution = []
@@ -38,6 +49,7 @@ def get_score_distribution(rule_list):
         prob = get_prob(rule)
         score_distribution.append(prob)
     return score_distribution
+
 
 def normalized_histogram_for_print(score_distribution, num_bins, denominator, limits):
     out = []
@@ -52,6 +64,7 @@ def normalized_histogram_for_print(score_distribution, num_bins, denominator, li
     out.append('\n')
     return ''.join(out)
 
+
 def probabilities_at_percentiles_for_print(distribution):
     out = ['\n']
     for n in range(10):
@@ -59,12 +72,14 @@ def probabilities_at_percentiles_for_print(distribution):
         out.append('Percentile ' + str(x) + ' corresponds to prob = ' + str(round(stats.scoreatpercentile(distribution, x), 8)) + '\n')
     return ''.join(out)
 
+
 def percentiles_at_probabilities_for_print(distribution):
     out = ['\n']
     for p in range(10):
         x = (p * 10.0/100.0)
         out.append('Probability ' + str(x) + ' corresponds to percentile = ' + str(round(stats.percentileofscore(distribution, x), 8)) + '\n')
     return ''.join(out)
+
 
 def get_part(score, percentile_scores):
     # percentiles = [20,40,60,80]
@@ -75,7 +90,7 @@ def get_part(score, percentile_scores):
         return parts[2]
 
     #'top'
-    if (score >= percentile_scores[3]):
+    if score >= percentile_scores[3]:
         return parts[0]
 
     #'middle'
@@ -83,6 +98,7 @@ def get_part(score, percentile_scores):
         return parts[1]
 
     return 'none'
+
 
 def get_part_limits(part, percentile_scores):
     if part == parts[0]:
@@ -93,10 +109,11 @@ def get_part_limits(part, percentile_scores):
         #'middle'
         return (percentile_scores[1], percentile_scores[2])
 
-    if (part == parts[2]):
+    if part == parts[2]:
         #'bottom'
         return (0, percentile_scores[0])
     return (0, 1)
+
 
 def get_sorted_rule_list(rule_list):
     res = []
@@ -110,6 +127,7 @@ def get_sorted_rule_list(rule_list):
             if feq(prob, curr_score):
                 res.append(rule)
     return res
+
 
 def get_rules_sample(rule_list, percentiles, max_sample_len):
     if len(rule_list) <= max_sample_len:
@@ -138,9 +156,14 @@ def get_rules_sample(rule_list, percentiles, max_sample_len):
             result_set = result_set.union(random.sample(rules_by_part[part], part_sample_len))
     res = []
     for rule in result_set:
-        if (rule not in res):
+        if rule not in res:
             res.append(rule)
+
+    # if we could not get a sample, then just return all the rules
+    if not res:
+        res = rule_list
     return get_sorted_rule_list(res)
+
 
 def get_distance(dist):
     if dist < 6:
@@ -151,11 +174,13 @@ def get_distance(dist):
         return '11-20'
     return '>20'
 
+
 def get_percentile_scores(percentiles, score_distribution):
     percentile_scores = []
     for x in percentiles:
         percentile_scores.append(stats.scoreatpercentile(score_distribution, x))
     return percentile_scores
+
 
 def scores_and_percentiles_display(score_distribution, intervals, db_size, limits):
     out = ['\n' + normalized_histogram_for_print(score_distribution, intervals, db_size, (0, 1))]
@@ -163,8 +188,9 @@ def scores_and_percentiles_display(score_distribution, intervals, db_size, limit
     out.append(percentiles_at_probabilities_for_print(score_distribution))
     return ''.join(out)
 
-def analyze_rules(all, percentile_scores):
-    db_size = len(all)
+
+def analyze_rules(all_rules, percentile_scores):
+    db_size = len(all_rules)
     data = {}
     data[whole] = {}
     data[whole]['sample'] = []
@@ -184,10 +210,10 @@ def analyze_rules(all, percentile_scores):
         data[per_source][part] = {}
         data[per_source][part]['tgtnum'] = []
 
-    random_sample_size = int(len(all) * 0.03)
+    random_sample_size = max(int(len(all_rules) * 0.03), 1)
     random_sample_size = min(random_sample_size, 25)
 
-    data[whole]['sample'] = get_rules_sample(all, [15, 40, 60, 85], random_sample_size)
+    data[whole]['sample'] = get_rules_sample(all_rules, [15, 40, 60, 85], random_sample_size)
 
     cnt = 0
     ten_percent_len = db_size/10
@@ -198,26 +224,26 @@ def analyze_rules(all, percentile_scores):
     for part in parts:
         stats_per_source[part] = {}
         stats_per_source[part]['tgtnum'] = 0
-    while len(all) > 0:
+    while len(all_rules) > 0:
         cnt = cnt + 1
         for percent in range(10):
             progress = percent * ten_percent_len
-            if (progress == cnt):
+            if progress == cnt:
                 sys.stdout.write(str(percent * 10) + "%... ")
                 sys.stdout.flush()
                 break
-        rule = all.pop(0)
+        rule = all_rules.pop(0)
         # the results must be sorted by source (rule[0]), if reached new source, save and reset statistics per source
-        if (w1 != rule[0]):
+        if w1 != rule[0]:
             # save the current stats_per_source to data
-            if (w1 != ""):
+            if w1 != "":
                 #parts + whole
                 for x in stats_per_source.keys():
                     #relations + tgtnum
                     for y in stats_per_source[x].keys():
-                        if (y not in data[per_source][x].keys()):
+                        if y not in data[per_source][x].keys():
                             data[per_source][x][y] = []
-                        if (stats_per_source[x][y] > 0):
+                        if stats_per_source[x][y] > 0:
                             data[per_source][x][y].append(stats_per_source[x][y])
             # reset statistics per source
             w1 = rule[0]
@@ -290,6 +316,7 @@ def analyze_rules(all, percentile_scores):
 
     return data
 
+
 def get_distances_for_print(part, data):
     if len(data[distances][part]['values']) == 0:
         return ""
@@ -304,11 +331,12 @@ def get_distances_for_print(part, data):
         else:
             #sample 3 rules from the current distance
             examples = random.sample(data[distances][part][dist], 3)
-        for rule in get_sorted_rule_list(examples):
+        for rule_str in rules_to_strings(get_sorted_rule_list(examples)):
             out.append('\t\t')
-            out.append(rule_for_print(rule) + '\n')
+            out.append(rule_str + '\n')
         out.append('\n')
     return ''.join(out)
+
 
 def part_analysis_display(part, data, percentile_scores, percentiles):
     out = ['\n*********************************************************************** Analyzing the ' + part + ' part of the resource.\n']
@@ -345,9 +373,9 @@ def part_analysis_display(part, data, percentile_scores, percentiles):
         out.append(normalized_histogram_for_print(distribution, 10, relSize, limits))
         out.append('      Examples:\n')
         #sample up to 12 rules from the current relation using the values in percentiles to divide the rules into parts
-        for rule in get_rules_sample(data[part][rel], percentiles, 12):
+        for rule_str in rules_to_strings(get_rules_sample(data[part][rel], percentiles, 12)):
             out.append('\t')
-            out.append(rule_for_print(rule) + '\n')
+            out.append(rule_str + '\n')
         out.append('\n')
     out.append(get_distances_for_print(part, data))
 
@@ -360,12 +388,13 @@ def part_analysis_display(part, data, percentile_scores, percentiles):
         out.append(source_relation_numbers_display_local(data[per_source][part][rel], rel, source_num))
     return ''.join(out)
 
+
 def whole_analysis_display(db_size, data):
     out = ['\nRandom rule sample: \n']
     out.append('-' * 20 + '\n')
-    for rule in data[whole]['sample']:
-        out.append('  ')
-        out.append(rule_for_print(rule) + '\n')
+    rules = data[whole]['sample']
+    for rule_str in rules_to_strings(rules):
+        out.append(rule_str + '\n')
     out.append('')
 
     out.append('\nStatistics for the ' + str(db_size) + ' rule(s): \n')
@@ -401,6 +430,7 @@ def whole_analysis_display(db_size, data):
 
     return ''.join(out)
 
+
 def source_target_numbers_display(counts):
     source_num = len(counts)
     if source_num == 0:
@@ -418,6 +448,7 @@ def source_target_numbers_display(counts):
         out.append("  The distribution of target sides per source is as follows:\n" + normalized_histogram_for_print(target_numbers, intervals, source_num, (min_n, max_n)))
     return ''.join(out)
 
+
 def source_target_numbers_display_local(counts):
     source_num = len(counts)
     if source_num == 0:
@@ -432,6 +463,7 @@ def source_target_numbers_display_local(counts):
         out.append("   The distribution of target sides per source is as follows:\n" + normalized_histogram_for_print(counts, intervals, source_num, (min_n, max_n)))
     return ''.join(out)
 
+
 def source_relation_numbers_display(counts, relation, total_source_num):
     if total_source_num == 0:
         return ''
@@ -444,8 +476,9 @@ def source_relation_numbers_display(counts, relation, total_source_num):
 
     # normalize with the total number of source sides, to count for those having 0 targets with the given relation
     avg = float(sum(relNumbers)) / total_source_num
-    out = ["\n   The average number of '" + relation.upper() + "' targets per source is: " + str(avg)]
+    out = ["\n  The average number of '" + relation.upper() + "' targets per source is: " + str(avg)]
     return ''.join(out)
+
 
 def source_relation_numbers_display_local(counts, relation, total_source_num):
     if total_source_num == 0:
@@ -456,8 +489,9 @@ def source_relation_numbers_display_local(counts, relation, total_source_num):
 
     # normalize with the total number of source sides, to count for those having 0 targets with the given relation
     avg = float(sum(counts)) / total_source_num
-    out = ["\n   The average number of '" + relation.upper() + "' targets per source is: " + str(avg)]
+    out = ["\n  The average number of '" + relation.upper() + "' targets per source is: " + str(avg)]
     return ''.join(out)
+
 
 def extract_frequent_terms(filename, num):
     f = open(filename, 'r')
@@ -471,7 +505,10 @@ def extract_frequent_terms(filename, num):
 
     res = []
     unigrams = nltk.FreqDist(text)
-    res.append(unigrams.keys()[int(len(unigrams) * 0.01):int(len(unigrams) * 0.01) + int(num/3)])
+    # use the first num/3 most frequent unigrams
+    for unigram, freq in unigrams.items()[:int(num/3)]:
+        res.append(unigram)
+    # res.append(unigrams.keys()[int(len(unigrams) * 0.01):int(len(unigrams) * 0.01) + int(num/3)])
 
     bigram_measures = nltk.collocations.BigramAssocMeasures()
     trigram_measures = nltk.collocations.TrigramAssocMeasures()
@@ -491,6 +528,7 @@ def extract_frequent_terms(filename, num):
     for trigram in finder.nbest(trigram_measures.pmi, int(num/3)):
         res.append(" ".join(trigram))
     return res
+
 
 def extract_terms(filename):
     f = open(filename, 'r')

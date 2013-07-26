@@ -19,12 +19,16 @@ import para_reader
 import para_wn
 import para_analysis
 
+
 class ParaQueryApp(Cmd):
 
     # set some basic class-wide variables
     _BASICSQLCMD = 'select source, target, pe2e1, relation, pivotnum, pivots, distance from paraphrase'
-    _COUNTSQLCMD = 'select count(*) as cnt from paraphrase'
+    # the counting SQL command needs to have a variable since we also want to show the value of the grouping by variable
+    # the {} variable is instantiated later appropriately depending on the value of the group_by setting
+    _COUNTSQLCMD = 'select "{}", count(*) as cnt from paraphrase'
     _FLIPPED_OPS = dict([('<', '>'), ('>', '<'), ('<=', '=>'), ('=>', '<=')])
+    _POS_IDX_TO_VALUES = {1: 'same', 0: 'different', -1: 'unknown'}
 
     #either 'basic' or 'count' depending on the query
     _mode = 'basic'
@@ -52,8 +56,8 @@ class ParaQueryApp(Cmd):
         self._identical = False
         self._order = 'pe2e1 asc'
         self._debug = False
-        # Field for 'group by', applied only for 'count' queries. Set to 'no' to avoild grouping
-        self._group_by = 'no'
+        # Field for 'group by', applied only for 'count' queries. Set to '' to avoid grouping
+        self._group_by = ''
         self._explain = False
         self._same_pos = False
         self._unique_tgt = False
@@ -104,14 +108,14 @@ class ParaQueryApp(Cmd):
         src = ""
         for fieldtuple in reader:
             #Input file must be sorted by the source side. When reached a new source, clean the target_lemmas list used to detect duplicate targets (with the same lemma)
-            if (src != fieldtuple[0]):
+            if src != fieldtuple[0]:
                 src = fieldtuple[0]
                 target_lemmas = set([])
             tgt = fieldtuple[1]
             duplicate_target_lemma = 1
             for tgt_lemma in para_wn.get_lemmas(tgt):
                 #consider the tgt as non-duplicate if at least one of its lemmas was not seen with the current source side before
-                if (tgt_lemma not in target_lemmas):
+                if tgt_lemma not in target_lemmas:
                     duplicate_target_lemma = 0
                 target_lemmas.add(tgt_lemma)
             relation = para_wn.get_wordnet_relation(src, tgt)[1]
@@ -240,7 +244,7 @@ class ParaQueryApp(Cmd):
 
     # set the value for the limit variable
     def _set_limit_value(self, value):
-        if value == 'off':
+        if value in ['off', 'none']:
             value = -1
         try:
             value = int(value)
@@ -251,7 +255,9 @@ class ParaQueryApp(Cmd):
 
     # set the value for the group_by variable
     def _set_group_by_value(self, value):
-        if value.lower() in ['no', 'source', 'target', 'identity', 'srclen', 'tgtlen', 'lendiff', 'relation', 'pivotnum', 'distance', 'samepos', 'tgtdupl']:
+        if value.lower() in ['none', 'off']:
+            self._group_by = ''
+        elif value.lower() in ['source', 'target', 'identity', 'srclen', 'tgtlen', 'lendiff', 'relation', 'pivotnum', 'distance', 'samepos', 'tgtdupl']:
             self._group_by = value.lower()
         else:
             sys.stderr.write("\n Error: incorrect value for setting.\n\n")
@@ -276,41 +282,41 @@ class ParaQueryApp(Cmd):
         identval = '1' if results.ident in ['same', 'identical'] else '0'
         conditional_part = 'where identity = {}'.format(identval)
         order_part = 'order by random()'
-        if (self._mode == 'basic'):
+        if self._mode == 'basic':
             # Lili Kotlerman: to remove limit, set limit < 0
             limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
             # Lili Kotlerman: to remove grouping, set group_by = ''
-            group_part = 'group by {}'.format(self._group_by) if self._group_by != 'no' else ''
-            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD, conditional_part, group_part, 'order by cnt asc'])
+            group_part = 'group by "{}"'.format(self._group_by)
+            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD.format(self._group_by), conditional_part, group_part, 'order by cnt asc'])
         return finalsql
 
     # generate the sql for 'show most probable', 'show least probable etc.'
     def _generate_unary_prob_sql(self, results):
         direction = 'desc' if results.adj == 'least' else 'asc'
         conditional_part = 'where identity = {}'.format(int(self._identical)) if not self._identical else ''
-        if (self._same_pos):
-            if (conditional_part == ''):
+        if self._same_pos:
+            if conditional_part == '':
                 conditional_part = 'where samepos = 1'
             else:
                 conditional_part += 'and samepos = 1'
-        if (self._unique_tgt):
-            if (conditional_part == ''):
+        if self._unique_tgt:
+            if conditional_part == '':
                 conditional_part = 'where tgtdupl = 0'
             else:
                 conditional_part += 'and tgtdupl = 0'
         order_part = 'order by pe2e1 {}'.format(direction)
-        if (self._mode == 'basic'):
+        if self._mode == 'basic':
             # Lili Kotlerman: to remove limit, set limit < 0
             limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
             # Lili Kotlerman: to remove grouping, set group_by = ''
-            group_part = 'group by {}'.format(self._group_by) if self._group_by != 'no' else ''
-            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD, conditional_part, group_part, 'order by cnt asc'])
+            group_part = 'group by "{}"'.format(self._group_by)
+            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD.format(self._group_by), conditional_part, group_part, 'order by cnt asc'])
         return finalsql
 
     def _generate_conditional_sql(self, results):
@@ -319,8 +325,6 @@ class ParaQueryApp(Cmd):
         identity_clause = False
 
         for cond in results.condition:
-            if self._debug:
-                print cond
             if bool(cond.probval):
                 probval = str(round(-math.log(float(cond.probval)), 4))
                 op = ParaQueryApp._FLIPPED_OPS[cond.op]
@@ -378,23 +382,22 @@ class ParaQueryApp(Cmd):
         # generate the order part
         order_part = 'order by {}'.format(self._order)
 
-        if (self._mode == 'basic'):
+        if self._mode == 'basic':
             # Lili Kotlerman: to remove limit, set limit < 0
             limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
             # Lili Kotlerman: to remove grouping, set group_by=''
-            group_part = 'group by {}'.format(self._group_by) if self._group_by != 'no' else ''
-            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD, conditional_part, group_part, 'order by cnt asc'])
+            group_part = 'group by "{}"'.format(self._group_by)
+            finalsql = ' '.join([ParaQueryApp._COUNTSQLCMD.format(self._group_by), conditional_part, group_part, 'order by cnt asc'])
         return finalsql
 
     # method to take a pyparsing ParseResults object and convert
-    # into an appropriate sql query
-
+    # into an appropriate sql query.
     def _generate_sql_from_query(self, query_results):
-        # set _mode = 'basic' or 'count'
-        self._mode = 'count' if (query_results.count) else 'basic'
+        # set _mode = 'basic' or 'count' but only for the show command. Nothing else.
+        self._mode = 'count' if query_results.count else 'basic'
         if bool(query_results.prob):
             return self._generate_unary_prob_sql(query_results)
         elif bool(query_results.ident):
@@ -404,64 +407,81 @@ class ParaQueryApp(Cmd):
 
     # how to display the output of the query
     def _display(self):
-        if (self._mode == 'basic'):
+        if self._mode == 'basic':
             rows = self._cursor.fetchall()
             if not rows:
                 return ''
+            newrows = []
             for row in rows:
-                src, tgt, prob, rel, pivnum, piv, dist = row
-                row = [src.encode('utf-8'), tgt.encode('utf-8'), prob, rel, pivnum, piv.encode('utf-8'), dist]
-            srclens = map(len, map(operator.itemgetter(0), rows))
-            trglens = map(len, map(operator.itemgetter(1), rows))
-            maxsrclen, maxtrglen = max(srclens), max(trglens)
-            return self._format_display(rows, self._interactive, maxsrclen, maxtrglen)
+                src, tgt, pe2e1, rel, pivnum, piv, dist = row
+                pe2e1 = math.exp(-float(pe2e1))
+                pe2e1str = '{:>6.4}'.format(pe2e1) if pe2e1 < 0.0001 else '{:0<6.4f}'.format(pe2e1)
+                rel_or_path = para_wn.get_relation_name(rel)
+                if rel_or_path == 'undefined relation':
+                    rel_or_path = 'WN distance=' + str(dist) if dist >= 0 else 'not connected in WN'
+                newrows.append([src.encode('utf-8'), tgt.encode('utf-8'), pe2e1str, rel_or_path, pivnum, piv.encode('utf-8'), dist])
+            srclens = map(len, map(operator.itemgetter(0), newrows))
+            trglens = map(len, map(operator.itemgetter(1), newrows))
+            probstrlens = map(len, map(operator.itemgetter(2), newrows))
+            relationlens = map(len, map(operator.itemgetter(3), newrows))
+            maxsrclen, maxtrglen, maxproblen, maxrellen = max(srclens), max(trglens), max(probstrlens), max(relationlens)
+            return self._format_display(newrows, self._interactive, maxsrclen, maxtrglen, maxproblen, maxrellen)
+        # display the count results
         else:
             rows = self._cursor.fetchall()
             if not rows:
                 return ''
-            res = ''
-            for row in rows:
-                res = res + str(row[0]) + '\n'
-            return res
+            res = ['']
+            rows = sorted(rows)
+            if self._group_by == 'relation':
+                rows = [(para_wn.get_relation_name(group), count) for (group, count) in rows]
+            elif self._group_by == 'samepos':
+                rows = [(self._POS_IDX_TO_VALUES[group], count) for (group, count) in rows]
+            else:
+                rows = [(str(group), count) for (group, count) in rows]
+            grouplens = map(len, map(operator.itemgetter(0), rows))
+            maxgrouplen = max(grouplens)
+            for group, count in rows:
+                if group == '':
+                    res.append(str(count))
+                else:
+                    res.append('{}\t{}'.format(group.rjust(maxgrouplen), count))
+            res.append('')
+            return '\n'.join(res)
 
     # helper formatting method for _display
-    def _format_display(self, rows, interactive_mode, maxsrclen, maxtrglen):
-        # if the results are to be show interactively ...
+    def _format_display(self, rows, interactive_mode, maxsrclen, maxtrglen, maxproblen, maxrellen):
+        # if the results are to be shown interactively ...
         if interactive_mode:
             out = ['']
             too_wide = maxsrclen > 25 and maxtrglen > 25
             for row in rows:
-                src, trg, pe2e1, rel, pivnum, piv, dist = row
-                pe2e1 = math.exp(-float(pe2e1))
+                src, trg, pe2e1str, relstr, pivnum, piv, dist = row
 
                 pivot_display = ""
-                if (self._explain):
+                if self._explain:
                     pivots = piv.replace('["', '').replace('"]', '').replace('\n', '').split('", "')
                     cnt = 1
                     for pivot in pivots:
-                        pivot_display += "\n    " + str(cnt) + ".  " + pivot.replace(':', ' : ').encode('utf-8')
+                        pivot_display += "\n    " + str(cnt) + ".  " + pivot.replace(':', ' : ')
                         cnt += 1
 
-                rel_or_path = para_wn.get_relation_name(rel)
-                if rel_or_path == 'undefined relation':
-                    rel_or_path = 'WN distance=' + str(dist) if dist >= 0 else 'not connected in WN'
-
                 if too_wide:
-                    out.append('\n  {} =>\n  {}\n  [{:0<6.4}]  [{}]  {}'.format(src, trg, pe2e1, rel_or_path, pivot_display))
-                    #out.append('  {} =>\n  {}\n  [{:0<6.4}]\n  [{}]\n'.format(src, trg, pe2e1,para_wn.get_relation_name(rel)))
+                    out.append('\n  {} =>\n  {}\n  [{}]  {}  {}'.format(src, trg, pe2e1str.rjust(maxproblen), relstr.ljust(maxrellen), pivot_display))
                 else:
                     if self._explain:
+                        # if we are displaying pivots then we don't need to make the prob and relation fields look perfectly aligned
                         pivot_display += '\n'
-                    out.append('  {} => {} [{:0<6.4}] [{}] {}'.format(src.rjust(maxsrclen), trg.ljust(maxtrglen), pe2e1, rel_or_path, pivot_display))
-                    #out.append('  {} => {} [{:0<6.4}] [{}]'.format(src.rjust(maxsrclen), trg.ljust(maxtrglen), pe2e1, para_wn.get_relation_name(rel)))
+                        out.append('  {} => {} [{}] {} {}'.format(src.rjust(maxsrclen), trg.ljust(maxtrglen), pe2e1str, relstr, pivot_display))
+                    else:
+                        out.append('  {} => {} [{}] {} {}'.format(src.rjust(maxsrclen), trg.ljust(maxtrglen), pe2e1str.rjust(maxproblen), relstr.ljust(maxrellen), pivot_display))
             out.append('')
         # otherwise generate simple tab-separated output for the script
         else:
             out = []
             for row in rows:
-                src, trg, pe2e1, rel, pivnum, piv = row
-                pe2e1 = math.exp(-float(pe2e1))
-                out.append('{}\t{}\t{:0<6.4}\t{}'.format(src, trg, pe2e1, para_wn.get_relation_name(rel)))
+                src, trg, pe2e1str, relstr, pivnum, piv = row
+                out.append('{}\t{}\t{}\t{}'.format(src, trg, pe2e1str, relstr))
         return '\n'.join(out)
 
     # method that runs the "show <query>"" command
@@ -500,7 +520,6 @@ class ParaQueryApp(Cmd):
         # e.g. show count source="man" and prob > 0.005
         # Pay attention: the returned value is not limited by the "limit" parameter
         """
-
         try:
             results = self._query_parser.parse(query)
         except:
@@ -515,20 +534,23 @@ class ParaQueryApp(Cmd):
 
     # method that runs the "explain <query>"" command
     def do_explain(self, query):
-
-        self._set_explain_value('on')
-        try:
-            results = self._query_parser.parse(query)
-        except:
-            sys.stderr.write('\n Error: cannot parse query.\n\n')
+        if query.count('count') > 0:
+            sys.stderr.write('\n Error: cannot use "count" modifier for explain queries.\n\n')
+            return False
         else:
-            sql_query = self._generate_sql_from_query(results)
-            if self._debug:
-                sys.stderr.write('\nQuery: ' + sql_query + ';\n')
-            self._cursor.execute(sql_query)
-            sys.stdout.write(self._display() + '\n')
-            sys.stdout.flush()
-        self._set_explain_value('off')
+            self._set_explain_value('on')
+            try:
+                results = self._query_parser.parse(query)
+            except:
+                sys.stderr.write('\n Error: cannot parse query.\n\n')
+            else:
+                sql_query = self._generate_sql_from_query(results)
+                if self._debug:
+                    sys.stderr.write('\nQuery: ' + sql_query + ';\n')
+                self._cursor.execute(sql_query)
+                sys.stdout.write(self._display() + '\n')
+                sys.stdout.flush()
+            self._set_explain_value('off')
 
     # Lili Kotlerman: added method returning query output
     # method that returns the "<query>" command results
@@ -584,77 +606,86 @@ class ParaQueryApp(Cmd):
             sys.stdout.flush()
         else:
             sys.stderr.write('\n No database attached. Cannot show info.\n\n')
+            return False
 
     def _get_rules(self, arg, query):
-        oldLimit = self._limit
+        # get the currently set limit value since we may have to override it
+        old_limit = self._limit
+
         rules = []
         if arg.count('top') > 0:
             # expected command is "analyze top N", where N is an int
-            topNrules = int(arg.split()[1])
-            self._set_limit_value(topNrules)
+            top_n_rules = int(arg.split()[1])
+            self._set_limit_value(top_n_rules)
             rules = self.do_get(query)
-            # restore usual limit value
-            # self._set_limit_value(oldLimit)
-
         elif arg.count('all') > 0:
+            # expected command is "analyze all"
             self._set_limit_value(-1)
             rules = self.do_get(query)
-            # restore usual limit value
-            # self._set_limit_value(oldLimit)
-
         else:
             self._set_limit_value(-1)
-            if (query != 'source = "*"'):
+            if query != 'source = "*"':
                 rules = self.do_get(" and ".join([query, arg]))
             else:
                 rules = self.do_get(arg)
-            # restore usual limit value
-            # self._set_limit_value(oldLimit)
 
-        # restore usual limit value
-        self._set_limit_value(oldLimit)
+        # restore previously set limit value
+        self._set_limit_value(old_limit)
 
         return rules
 
     # Lili Kotlerman: added method to analyze the database
     def do_analyze(self, arg):
         """
-        Analyze the attached paraphrase database / query results and output the results to a text file anal.txt
+        Analyze the attached paraphrase database / query results and output the results to "analysis.txt" in the current directory
         """
+        # no counting allowed
+        if arg.count('count') > 0:
+            sys.stderr.write('\n Error: cannot use "count" modifier for analyze queries.\n\n')
+            return False
 
         if arg.count('using') > 0:
+            # no source conditions allowed unless 'using' is not specified
+            if arg.count('source') > 0:
+                sys.stderr.write('\n Error: cannot specify source condition for analyze queries with external source.\n\n')
+                return False
             rules = []
             user_srcs = []
             if arg.count('text') > 0:
                 user_srcs = para_analysis.extract_frequent_terms(arg.split('text ')[1], 100)
                 user_srcs.sort()
-                sys.stdout.write('The {} most frequent terms in the given text are:\n {}\n'.format(len(user_srcs), ', '.join(user_srcs)))
+                sys.stdout.write('\nThe {} most frequent terms in the given text are:\n {}\n'.format(len(user_srcs), ', '.join(user_srcs)))
             elif arg.count('terms') > 0:
                 user_srcs = para_analysis.extract_terms(arg.split('terms ')[1])
-                sys.stdout.write('The number of terms is: {}.\n'.format(str(len(user_srcs))))
+                sys.stdout.write('\nFound {} terms.\n'.format(str(len(user_srcs))))
             else:
-                sys.stdout.write('Cannot parse the command.')
-                sys.stdout.flush()
+                sys.stderr.write('\n Error: cannot parse query.\n\n')
+                return False
 
-            sys.stdout.write('Retrieving rules from the database ... ')
+            sys.stdout.write('\n Retrieving rules from the database ... ')
             sys.stdout.flush()
             for user_src in user_srcs:
                 query = 'source = "' + user_src.lower() + '"'
                 rules += self._get_rules(arg, query)
         else:
+            user_srcs = []
             query = 'source = "*"'
-            sys.stdout.write('Retrieving rules from the database ... ')
+            sys.stdout.write('\n Retrieving rules from the database ... ')
             sys.stdout.flush()
             rules = self._get_rules(arg, query)
 
         db_size = len(rules)
-        print "found", db_size, "paraphrase rules. \nAnalyzing..."
+        sys.stdout.write("found {} paraphrase rules.\n".format(db_size))
         if db_size > 0:
+            sys.stdout.write("\n Analyzing...")
             # sort to group rules for each source together, one by one
             rules.sort()
             out_text = ['\n\n\n===================================================== ANALYSIS =================================================================\n']
+            out_text.append('Command: {}\n'.format('analyze ' + arg))
             out_text.append(self._dbfile + '\n')
-            out_text.append(str(datetime.now()) + '\n')
+            out_text.append(str(datetime.now()) + '\n\n')
+            if user_srcs:
+                out_text.append('Terms analyzed: {}\n'.format(user_srcs))
             # top rules have scores > percentiles[3] percentile, bottom rules have scores < percentiles[0] percentile,
             # middle rules are between percentiles[1] and percentiles[2] percentile
             percentiles = [15, 40, 60, 85]
@@ -674,7 +705,7 @@ class ParaQueryApp(Cmd):
                 for part in para_analysis.parts:
                     out_text.append(para_analysis.part_analysis_display(part, data, percentile_scores, percentiles))
 
-            f = open('anal.txt', 'a')
+            f = open('analysis.txt', 'a')
             f.write(''.join(out_text))
             f.close()
 

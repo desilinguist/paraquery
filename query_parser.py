@@ -82,7 +82,7 @@ class Parser:
         # final query string
         # Lili Kotlerman: added 'count' to queries
         count = Word('count')
-        self._queryStr = Optional(count("count"))+(multipleBinaryQueryStr | unaryQueryStr)
+        self._queryStr = Optional(count("count")) + (multipleBinaryQueryStr | unaryQueryStr)
 
     def parse(self, query):
         return self._queryStr.parseString(query)

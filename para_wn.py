@@ -12,8 +12,10 @@ _relation_names_to_ids = dict([(name, idx) for (idx, name) in enumerate(_relatio
 def internal_form(word):
     return word.replace(' ', '_').lower()
 
+
 def external_form(word):
     return word.replace('_', ' ').lower()
+
 
 def get_path_length(synsetA, synsetB):
     ## taken from http://blog.typeslashcode.com/voxpop/2009/10/returning-wordnet-shortest-path-distance-with-nltk/
@@ -66,6 +68,7 @@ def get_shortest_path(word_a, word_b):
                     if (path_distance < 0 or dist < path_distance):
                         path_distance = dist
     return path_distance
+
 
 def get_phrase_lemma(words):
     a_lemma = ""
@@ -463,6 +466,7 @@ def get_relation_id(rel):
     """
     return _relation_names_to_ids[rel]
 
+
 def get_relation_name(rel):
     """
     0 - Pair not found in WN. Can add "relation > 0" condition to queries in order to retrieve only pairs, found in WN (i.e. both src and tgt are in WN)
@@ -478,6 +482,7 @@ def get_relation_name(rel):
     7 - Undefined relation, i.e. both words are found in WN, but their relation is not among the above
     """
     return _relation_ids_to_names[rel] if rel in _relation_ids_to_names else ''
+
 
 def get_wordnet_relation(word_a, word_b):
     rel = 'not in WN'
@@ -503,4 +508,3 @@ def get_wordnet_relation(word_a, word_b):
         else:
             rel = 'undefined relation'
     return (rel, get_relation_id(rel))
-
