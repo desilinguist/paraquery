@@ -19,7 +19,7 @@ ParaQuery has a number of parameters that affect the output of the various comma
 
 - `unique_tgt` (False): when set to "True", paraphrase rules where the target strings are variants of the same lemma are excluded, e.g., if the source word "examination" has two paraphrase rules - one with "examined" as the target string and one with "examine", only the latter is retained in the output. To turn unique targets on (off), use `set unique_tgt on (off)`.
 
-- `group_by` (): this parameter is used to group the results of count queries (see [Counting paraphrase rules] below), e.g., if set to, say, the WordNet relation field (`set group_by relation`) and a query like `show count source = "man"` is issued, separate counts for each type of relation will be output. If `group_by` is empty (`set group_by none`), then a single count value is returned. Possible values for `group_by` are:
+- `group_by` (): this parameter is used to group the results of count queries (see [Counting paraphrase rules](#counting-paraphrase-rules below), e.g., if set to, say, the WordNet relation field (`set group_by relation`) and a query like `show count source = "man"` is issued, separate counts for each type of relation will be output. If `group_by` is empty (`set group_by none`), then a single count value is returned. Possible values for `group_by` are:
     - *target*: group counts by target strings.
     - *tgtlen*: group counts by target string lengths.
     - *lendiff*: group counts by difference in lengths between the source and target strings.
@@ -61,7 +61,7 @@ It is also useful to examine what pivots were used to generate a particular phra
 
 ### Counting paraphrase rules
 
-The `show` command can also be used to produce a rule count instead of the actual rules themselves. This is easily done by placing the word `count` before the condition part of the `show` command, e.g., `show count source = "man" and prob > 0.1`. The result are simple counts unless the `group_by` (see [ParaQuery parameters] above) in which case multiple count values may be returned. Note that the `count` modifier is only supported with the `show` command and *not* with `explain` and `analyze`.
+The `show` command can also be used to produce a rule count instead of the actual rules themselves. This is easily done by placing the word `count` before the condition part of the `show` command, e.g., `show count source = "man" and prob > 0.1`. The result are simple counts unless the `group_by` (see [ParaQuery parameters](#paraquery-parameters) above) in which case multiple count values may be returned. Note that the `count` modifier is only supported with the `show` command and *not* with `explain` and `analyze`.
 
 ### Analyzing paraphrase rules in detail
 
