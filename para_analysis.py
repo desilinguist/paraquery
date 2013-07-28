@@ -339,7 +339,7 @@ def get_distances_for_print(part, data):
 
 
 def part_analysis_display(part, data, percentile_scores, percentiles):
-    out = ['\n*********************************************************************** Analyzing the ' + part + ' part of the resource.\n']
+    out = ['\n***********************************************************************\n Analyzing the ' + part + ' part of the resource.\n']
     limits = get_part_limits(part, percentile_scores)
     out.append('   Scores between: ' + str(limits) + '\n')
     if len(data[pivots][part]) == 0:

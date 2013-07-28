@@ -29,6 +29,7 @@ class ParaQueryApp(Cmd):
     _COUNTSQLCMD = 'select "{}", count(*) as cnt from paraphrase'
     _FLIPPED_OPS = dict([('<', '>'), ('>', '<'), ('<=', '=>'), ('=>', '<=')])
     _POS_IDX_TO_VALUES = {1: 'same', 0: 'different', -1: 'unknown'}
+    _ORDER_VALUES = {'highest first': 'pe2e1 asc', 'lowest first': 'pe2e1 desc'}
 
     #either 'basic' or 'count' depending on the query
     _mode = 'basic'
@@ -54,7 +55,7 @@ class ParaQueryApp(Cmd):
         # Applied to 'basic' queries, not to 'count' queries
         self._limit = 10
         self._identical = False
-        self._order = 'pe2e1 asc'
+        self._order = 'highest first'
         self._debug = False
         # Field for 'group by', applied only for 'count' queries. Set to '' to avoid grouping
         self._group_by = ''
@@ -235,10 +236,10 @@ class ParaQueryApp(Cmd):
     def _set_order_value(self, value):
         if value.lower() in ['random', 'rand']:
             self._order = 'random()'
-        elif value.lower() in ['prob', 'pe2e1', 'probability', 'highprobfirst', 'asc', 'up', 'increasing']:
-            self._order = 'pe2e1 asc'
-        elif value.lower() in ['lowprobfirst', 'desc', 'down', 'decreasing']:
-            self._order = 'pe2e1 desc'
+        elif value.lower() in ['prob', 'pe2e1', 'probability', 'highprobfirst', 'desc', 'down', 'decreasing']:
+            self._order = 'highest first'
+        elif value.lower() in ['lowprobfirst', 'asc', 'up', 'increasing']:
+            self._order = 'lowest first'
         else:
             sys.stderr.write('\n Error: incorrect value for setting.\n\n')
 
@@ -248,6 +249,7 @@ class ParaQueryApp(Cmd):
             value = -1
         try:
             value = int(value)
+            assert value != 0
         except:
             sys.stderr.write('\n Error: incorrect value for setting.\n\n')
         else:
@@ -265,14 +267,13 @@ class ParaQueryApp(Cmd):
     # print out the current variable settings
     def _show_settings(self):
         out = ['\n Current settings:']
-        out.append('  identical: {}'.format(self._identical))
         out.append('  limit: {}'.format(self._limit))
         out.append('  order: {}'.format(self._order))
-        out.append('  group_by: {}'.format(self._group_by))
-        out.append('  debug: {}'.format(self._debug))
-        out.append('  explain: {}'.format(self._explain))
+        out.append('  identical: {}'.format(self._identical))
         out.append('  same_pos: {}'.format(self._same_pos))
         out.append('  unique_tgt: {}'.format(self._unique_tgt))
+        out.append('  group_by: {}'.format(self._group_by))
+        out.append('  debug: {}'.format(self._debug))
         out.append('\n')
         sys.stdout.write('\n'.join(out))
         sys.stdout.flush()
@@ -283,8 +284,8 @@ class ParaQueryApp(Cmd):
         conditional_part = 'where identity = {}'.format(identval)
         order_part = 'order by random()'
         if self._mode == 'basic':
-            # Lili Kotlerman: to remove limit, set limit < 0
-            limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
+            # Lili Kotlerman: to remove limit, set limit off
+            limit_part = 'limit {}'.format(self._limit) if self._limit > 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
@@ -310,7 +311,7 @@ class ParaQueryApp(Cmd):
         order_part = 'order by pe2e1 {}'.format(direction)
         if self._mode == 'basic':
             # Lili Kotlerman: to remove limit, set limit < 0
-            limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
+            limit_part = 'limit {}'.format(self._limit) if self._limit > 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
@@ -380,11 +381,11 @@ class ParaQueryApp(Cmd):
         conditional_part = 'where ' + ' and '.join(conditional_part)
 
         # generate the order part
-        order_part = 'order by {}'.format(self._order)
+        order_part = 'order by {}'.format(self._ORDER_VALUES[self._order])
 
         if self._mode == 'basic':
             # Lili Kotlerman: to remove limit, set limit < 0
-            limit_part = 'limit {}'.format(self._limit) if self._limit >= 0 else ''
+            limit_part = 'limit {}'.format(self._limit) if self._limit > 0 else ''
             finalsql = ' '.join([ParaQueryApp._BASICSQLCMD, conditional_part, order_part, limit_part])
         else:
             #'count'
@@ -460,7 +461,7 @@ class ParaQueryApp(Cmd):
 
                 pivot_display = ""
                 if self._explain:
-                    pivots = piv.replace('["', '').replace('"]', '').replace('\n', '').split('", "')
+                    pivots = piv.strip().replace('["', '').replace('"]', '').replace('\n', '').split('", "')
                     cnt = 1
                     for pivot in pivots:
                         pivot_display += "\n    " + str(cnt) + ".  " + pivot.replace(':', ' : ')
@@ -480,8 +481,11 @@ class ParaQueryApp(Cmd):
         else:
             out = []
             for row in rows:
-                src, trg, pe2e1str, relstr, pivnum, piv = row
-                out.append('{}\t{}\t{}\t{}'.format(src, trg, pe2e1str, relstr))
+                src, trg, pe2e1str, relstr, pivnum, piv, dist = row
+                if self._explain:
+                    out.append('{}\t{}\t{}\t{}\t{}'.format(src, trg, pe2e1str, relstr, piv.strip()))
+                else:
+                    out.append('{}\t{}\t{}\t{}'.format(src, trg, pe2e1str, relstr))
         return '\n'.join(out)
 
     # method that runs the "show <query>"" command
@@ -563,7 +567,7 @@ class ParaQueryApp(Cmd):
         try:
             results = self._query_parser.parse(query)
         except:
-            sys.stderr.write('\n Error: cannot parse query.\n\n')
+            raise Exception
         else:
             sql_query = self._generate_sql_from_query(results)
             if self._debug:
@@ -617,17 +621,20 @@ class ParaQueryApp(Cmd):
             # expected command is "analyze top N", where N is an int
             top_n_rules = int(arg.split()[1])
             self._set_limit_value(top_n_rules)
-            rules = self.do_get(query)
+            get_arg = query
         elif arg.count('all') > 0:
             # expected command is "analyze all"
             self._set_limit_value(-1)
-            rules = self.do_get(query)
+            get_arg = query
         else:
-            self._set_limit_value(-1)
-            if query != 'source = "*"':
-                rules = self.do_get(" and ".join([query, arg]))
-            else:
-                rules = self.do_get(arg)
+            # note that here the results are subject to the global limit
+            # if the source is not specified then assume it's everything
+            get_arg = arg if query == 'source = "*"' else " and ".join([query, arg])
+
+        try:
+            rules = self.do_get(get_arg)
+        except:
+            sys.stderr.write('\n Error: cannot parse query.\n')
 
         # restore previously set limit value
         self._set_limit_value(old_limit)
@@ -639,6 +646,11 @@ class ParaQueryApp(Cmd):
         """
         Analyze the attached paraphrase database / query results and output the results to "analysis.txt" in the current directory
         """
+        # analyze commands can only be run in interactive mode
+        if not self._interactive:
+            sys.stderr.write('\n Error: analyze commands cannot be run from scripts.\n\n')
+            return False
+
         # no counting allowed
         if arg.count('count') > 0:
             sys.stderr.write('\n Error: cannot use "count" modifier for analyze queries.\n\n')
@@ -657,7 +669,7 @@ class ParaQueryApp(Cmd):
                 sys.stdout.write('\nThe {} most frequent terms in the given text are:\n {}\n'.format(len(user_srcs), ', '.join(user_srcs)))
             elif arg.count('terms') > 0:
                 user_srcs = para_analysis.extract_terms(arg.split('terms ')[1])
-                sys.stdout.write('\nFound {} terms.\n'.format(str(len(user_srcs))))
+                sys.stdout.write('\n Found {} terms.\n'.format(str(len(user_srcs))))
             else:
                 sys.stderr.write('\n Error: cannot parse query.\n\n')
                 return False
@@ -670,12 +682,15 @@ class ParaQueryApp(Cmd):
         else:
             user_srcs = []
             query = 'source = "*"'
-            sys.stdout.write('\n Retrieving rules from the database ... ')
             sys.stdout.flush()
             rules = self._get_rules(arg, query)
+            sys.stdout.write('\n Retrieving rules from the database ... ')
 
         db_size = len(rules)
-        sys.stdout.write("found {} paraphrase rules.\n".format(db_size))
+        if self._limit > 0 and arg.count('using') == 0:
+            sys.stdout.write("found {} paraphrase rules (limit = {}).\n".format(db_size, self._limit))
+        else:
+            sys.stdout.write("found {} paraphrase rules.\n".format(db_size))
         if db_size > 0:
             sys.stdout.write("\n Analyzing...")
             # sort to group rules for each source together, one by one
@@ -684,6 +699,9 @@ class ParaQueryApp(Cmd):
             out_text.append('Command: {}\n'.format('analyze ' + arg))
             out_text.append(self._dbfile + '\n')
             out_text.append(str(datetime.now()) + '\n\n')
+            # write out a warning for non "using" queries if the limit was set
+            if self._limit > 0 and arg.count('using') == 0:
+                out_text.append('WARNING: this analysis was conducted with limit set to {}, i.e., only the top {} rules for each source string were analyzed. To analyze all rules, please use "set limit none" before running the analysis command.\n\n'.format(self._limit, self._limit))
             if user_srcs:
                 out_text.append('Terms analyzed: {}\n'.format(user_srcs))
             # top rules have scores > percentiles[3] percentile, bottom rules have scores < percentiles[0] percentile,
@@ -696,9 +714,9 @@ class ParaQueryApp(Cmd):
             data = para_analysis.analyze_rules(rules, percentile_scores)
 
             # Add analysis of the whole collection
-            anal_to_print = para_analysis.whole_analysis_display(db_size, data)
-            out_text.append(anal_to_print)
-            sys.stdout.write(anal_to_print + '\n\n')
+            analysis_to_print = para_analysis.whole_analysis_display(db_size, data)
+            out_text.append(analysis_to_print)
+            sys.stdout.write(analysis_to_print + '\n\n')
             sys.stdout.flush()
 
             if db_size > 1000:
@@ -707,6 +725,7 @@ class ParaQueryApp(Cmd):
 
             f = open('analysis.txt', 'a')
             f.write(''.join(out_text))
+            f.flush()
             f.close()
 
 if __name__ == '__main__':
