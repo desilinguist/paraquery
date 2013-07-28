@@ -101,6 +101,7 @@ Once these files are ready, paraphrase rule files can be created as follows:
 
 Using ParaQuery
 ---------------
+
 Once the gzipped paraphrase file has been  generated, it can be easily converted to the SQLite database from inside ParaQuery:
 
  - Run `paraquery` (the launching script provided)
@@ -108,14 +109,7 @@ Once the gzipped paraphrase file has been  generated, it can be easily converted
 `index final-para-grammar-sorted.gz`
  - If a `.paradb` file in the current directory, `paraquery` will automatically attach it and output a message when starting up. Otherwise, the path to the `.paradb` file must be provided as an argument.
 
-Once you have a database loaded up, you can use the following commands to explore and examine the paraphrases:
-
-- `show` : query database for paraphrase pairs with specific properties, e.g., to get all paraphrases with a probability score less than 0.1 for the word "man", use the query
-`show source = "man" and prob < 0.1`.
-- `examine`: show results as with the `show` command but also explain why each result exists by showing what pivots were used to generate it.
-- `analyze`: analyze paraphrases rules in terms of how useful they for a given text from a given domain.
-
-The following [paper](http://desilinguist.org/pdf/demo2013.pdf) explains and illustrates the commands in detail.
+Once you have a database loaded up, you can use all the commands that ParaQuery supports. Please read the detailed [user manual](https://github.com/desilinguist/paraquery/blob/master/manual.md) for a detailed explanation of how to use ParaQuery.
 
 Acknowledgments
 -----
