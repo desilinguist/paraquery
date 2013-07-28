@@ -10,6 +10,8 @@ For running ParaQuery with the bundled databases, you need:
 - Python 2.7 or higher.
 - SQLite
 - [NLTK](http://www.nltk.org)
+- [NumPy](http://www.numpy.org)
+- [SciPy](http://www.scipy.org)
 
 However, if you need to generate paraphrase rules from your own bilingual data, then you also need:
 
