@@ -111,7 +111,7 @@ Once the gzipped paraphrase file has been  generated, it can be easily converted
 `index final-para-grammar-sorted.gz`
  - If a `.paradb` file in the current directory, `paraquery` will automatically attach it and output a message when starting up. Otherwise, the path to the `.paradb` file must be provided as an argument.
 
-Once you have a database loaded up, you can use all the commands that ParaQuery supports. Please read the detailed [user manual](https://github.com/desilinguist/paraquery/blob/master/manual.md) for a detailed explanation of how to use ParaQuery.
+Once you have a database loaded up, you can use all the commands that ParaQuery supports. Please read the detailed [user manual](manual.md) for a detailed explanation of how to use ParaQuery.
 
 Acknowledgments
 -----
