@@ -55,7 +55,7 @@ class Parser:
         # 3. BINARY Prob <-> number query
         #    Example: prob < 0.5, prob >= 0.5
         ####################################################
-        zeroToOneFloat = Combine(Literal("0.") + Word(nums))
+        zeroToOneFloat = Combine(Literal("0.") + Word(nums)) | Combine(Word(nums) + Literal("e-") + Word(nums))
         Op = oneOf("> < <= >=")
         binaryProbQueryStr = (Literal("prob")("lhs") + Op("op") + zeroToOneFloat("probval"))("condition*")
 
