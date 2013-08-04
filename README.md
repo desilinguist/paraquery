@@ -10,6 +10,7 @@ For running ParaQuery with the bundled databases, you need:
 - Python 2.7 or higher.
 - SQLite
 - [NLTK](http://www.nltk.org)
+- [Pyparsing](http://pyparsing.wikispaces.com)
 - [NumPy](http://www.numpy.org)
 - [SciPy](http://www.scipy.org)
 
