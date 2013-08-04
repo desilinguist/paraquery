@@ -331,8 +331,6 @@ class ParaQueryApp(Cmd):
                 op = ParaQueryApp._FLIPPED_OPS[cond.op]
                 conditional_part.append(' '.join(['pe2e1', op, probval]))
             elif bool(cond.rhs):
-                import pdb
-                pdb.set_trace()
                 if cond.op in ['<', '>']:
                     op = ParaQueryApp._FLIPPED_OPS[cond.op] if cond.lhs == 'source' else cond.op
                     if bool(cond.lenclause):
