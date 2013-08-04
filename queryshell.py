@@ -27,7 +27,7 @@ class ParaQueryApp(Cmd):
     # the counting SQL command needs to have a variable since we also want to show the value of the grouping by variable
     # the {} variable is instantiated later appropriately depending on the value of the group_by setting
     _COUNTSQLCMD = 'select "{}", count(*) as cnt from paraphrase'
-    _FLIPPED_OPS = dict([('<', '>'), ('>', '<'), ('<=', '=>'), ('=>', '<=')])
+    _FLIPPED_OPS = dict([('<', '>'), ('>', '<')])
     _POS_IDX_TO_VALUES = {1: 'same', 0: 'different', -1: 'unknown'}
     _ORDER_VALUES = {'highest first': 'pe2e1 asc', 'lowest first': 'pe2e1 desc'}
 
@@ -331,10 +331,12 @@ class ParaQueryApp(Cmd):
                 op = ParaQueryApp._FLIPPED_OPS[cond.op]
                 conditional_part.append(' '.join(['pe2e1', op, probval]))
             elif bool(cond.rhs):
-                if cond.op in ['<', '>', '<=', '=>']:
+                import pdb
+                pdb.set_trace()
+                if cond.op in ['<', '>']:
                     op = ParaQueryApp._FLIPPED_OPS[cond.op] if cond.lhs == 'source' else cond.op
                     if bool(cond.lenclause):
-                        lendiff = '-' + cond.lenclause.lendiff if cond.lhs == 'source' else cond.lenclause.lendiff
+                        lendiff = '-' + cond.lenclause.lendiff if cond.lhs == 'source' and cond.op == '>' else cond.lenclause.lendiff
                         conditional_part.append(' '.join(['lendiff = ', lendiff]))
                     else:
                         conditional_part.append(' '.join(['lendiff', op, '0']))
@@ -346,9 +348,12 @@ class ParaQueryApp(Cmd):
                 fieldname = 'srclen' if cond.lhs == 'source' else 'tgtlen'
                 conditional_part.append(' '.join([fieldname, cond.op, cond.lenclause.len]))
             elif bool(cond.phrase):
-                op = 'GLOB' if cond.phrase.find('*') > 0 else '='
+                # we want string literals to always be in single quotes in case
+                # the literal is one of the field names in the database
+                single_quoted_phrase = cond.phrase.replace('"', "'")
+                op = 'GLOB' if single_quoted_phrase.find('*') > 0 else '='
                 # phrase = '*' + cond.phrase + '*' if cond.op == 'contains' else cond.phrase
-                conditional_part.append(' '.join([cond.lhs, op, cond.phrase]))
+                conditional_part.append(' '.join([cond.lhs, op, single_quoted_phrase]))
             elif bool(cond.relname):
                 #Lili Kotlerman: added (WN) relation condition
                 relname = cond.relname
