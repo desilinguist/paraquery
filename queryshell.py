@@ -174,7 +174,7 @@ class ParaQueryApp(Cmd):
 
     def do_attach(self, dbpath):
         """
-        Attach to database at given path.
+        Attach database at given path.
         """
         dbfile = os.path.join(dbpath, '.paradb')
         if os.path.exists(dbfile):
@@ -527,6 +527,11 @@ class ParaQueryApp(Cmd):
         # e.g. show count source="man" and prob > 0.005
         # Pay attention: the returned value is not limited by the "limit" parameter
         """
+        # make sure a database is attached
+        if not hasattr(self, '_cursor'):
+            sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
+            return False
+
         try:
             results = self._query_parser.parse(query)
         except:
@@ -541,27 +546,39 @@ class ParaQueryApp(Cmd):
 
     # method that runs the "explain <query>"" command
     def do_explain(self, query):
+        """
+        Same as 'show()' but further explains the results of
+        the given query by showing the pivots used to generate them.
+        """
+
+        # make sure a database is attached
+        if not hasattr(self, '_cursor'):
+            sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
+            return False
+
+        # cannot use 'count' queries with 'explain'
         if query.count('count') > 0:
             sys.stderr.write('\n Error: cannot use "count" modifier for explain queries.\n\n')
             return False
+
+        self._set_explain_value('on')
+        try:
+            results = self._query_parser.parse(query)
+        except:
+            sys.stderr.write('\n Error: cannot parse query.\n\n')
         else:
-            self._set_explain_value('on')
-            try:
-                results = self._query_parser.parse(query)
-            except:
-                sys.stderr.write('\n Error: cannot parse query.\n\n')
-            else:
-                sql_query = self._generate_sql_from_query(results)
-                if self._debug:
-                    sys.stderr.write('\nQuery: ' + sql_query + ';\n')
-                self._cursor.execute(sql_query)
-                sys.stdout.write(self._display() + '\n')
-                sys.stdout.flush()
-            self._set_explain_value('off')
+            sql_query = self._generate_sql_from_query(results)
+            if self._debug:
+                sys.stderr.write('\nQuery: ' + sql_query + ';\n')
+            self._cursor.execute(sql_query)
+            sys.stdout.write(self._display() + '\n')
+            sys.stdout.flush()
+        self._set_explain_value('off')
 
     # Lili Kotlerman: added method returning query output
     # method that returns the "<query>" command results
-    def do_get(self, query):
+    # as a list rather than printing them out
+    def _get_results(self, query):
         """
         Run queries on attached paraphrase database and get their output in return.
         Examples the same as for do_show(), with "get" instead of "show"
@@ -612,7 +629,7 @@ class ParaQueryApp(Cmd):
             sys.stdout.write('\n Database {} with {} paraphrase rules.\n\n'.format(self._dbfile, self._num_records))
             sys.stdout.flush()
         else:
-            sys.stderr.write('\n No database attached. Cannot show info.\n\n')
+            sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
             return False
 
     def _get_rules(self, arg, query):
@@ -635,7 +652,7 @@ class ParaQueryApp(Cmd):
             get_arg = arg if query == 'source = "*"' else " and ".join([query, arg])
 
         try:
-            rules = self.do_get(get_arg)
+            rules = self._get_results(get_arg)
         except:
             sys.stderr.write('\n Error: cannot parse query.\n')
 
@@ -649,6 +666,11 @@ class ParaQueryApp(Cmd):
         """
         Analyze the attached paraphrase database / query results and output the results to "analysis.txt" in the current directory
         """
+        # make sure we have a database attached
+        if not hasattr(self, '_cursor'):
+            sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
+            return False
+
         # analyze commands can only be run in interactive mode
         if not self._interactive:
             sys.stderr.write('\n Error: analyze commands cannot be run from scripts.\n\n')
