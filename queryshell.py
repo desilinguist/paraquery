@@ -528,7 +528,7 @@ class ParaQueryApp(Cmd):
         # Pay attention: the returned value is not limited by the "limit" parameter
         """
         # make sure a database is attached
-        if not hasattr(self, '_cursor'):
+        if not hasattr(self, '_dbfile'):
             sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
             return False
 
@@ -552,7 +552,7 @@ class ParaQueryApp(Cmd):
         """
 
         # make sure a database is attached
-        if not hasattr(self, '_cursor'):
+        if not hasattr(self, '_dbfile'):
             sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
             return False
 
@@ -667,7 +667,7 @@ class ParaQueryApp(Cmd):
         Analyze the attached paraphrase database / query results and output the results to "analysis.txt" in the current directory
         """
         # make sure we have a database attached
-        if not hasattr(self, '_cursor'):
+        if not hasattr(self, '_dbfile'):
             sys.stderr.write('\n No database attached.\n Use "index <filename>" to generate a new database.\n Use "attach <path>" to attach a database.\n\n')
             return False
 
