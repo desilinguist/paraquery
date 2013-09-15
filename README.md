@@ -1,3 +1,5 @@
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/desilinguist/paraquery/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
 What is ParaQuery?
 ------------------
 ParaQuery is a tool that helps a user interactively explore and characterize a given pivoted paraphrase collection, analyze its utility for a particular domain, and compare it to other popular lexical similarity resources – all within a single interface.
@@ -117,7 +119,4 @@ Once you have a database loaded up, you can use all the commands that ParaQuery 
 Acknowledgments
 -----
 We would like to thank [Juri Ganitkevitch](http://cs.jhu.edu/~juri/), [Jonny Weese](http://cs.jhu.edu/~jonny/), and [Chris Callison-Burch](http://www.cs.jhu.edu/~ccb/) for all their help and guidance during the development of ParaQuery.
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/desilinguist/paraquery/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
